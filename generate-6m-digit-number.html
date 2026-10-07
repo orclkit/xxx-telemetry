@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>6 Million Digit Number Generator</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --accent: #38bdf8;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --border: #334155;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 1.4rem; margin: 0 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 20px; }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: flex-end;
+    margin-bottom: 16px;
+  }
+  label { display: block; font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+  input, select {
+    background: #0f172a;
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+  }
+  input[type="number"] { width: 160px; }
+  button {
+    background: var(--accent);
+    color: #0f172a;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+  button.secondary { background: #475569; color: var(--text); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin: 12px 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+  }
+  .stats b { color: var(--text); }
+  .output {
+    width: 100%;
+    height: 320px;
+    background: #0b1220;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: #a5f3fc;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    padding: 12px;
+    resize: vertical;
+    word-break: break-all;
+    white-space: pre-wrap;
+  }
+  .progress {
+    height: 6px;
+    background: #0b1220;
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 10px 0;
+    display: none;
+  }
+  .progress .bar { height: 100%; width: 0%; background: var(--accent); transition: width 0.1s; }
+  .note { font-size: 0.78rem; color: var(--muted); margin-top: 10px; }
+
+  /* White box holding the 6 columns */
+  .columns-box {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 16px 0;
+    display: none; /* shown after generation */
+  }
+  .columns-head {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .columns-head div {
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+    padding-bottom: 4px;
+  }
+  .columns-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    max-height: 340px;
+    overflow: auto;
+  }
+  .columns-grid .col {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #0f172a;
+    word-break: break-all;
+    white-space: pre-wrap;
+    border-right: 1px solid #f1f5f9;
+    padding-right: 6px;
+  }
+  .columns-grid .col:last-child { border-right: none; }
+  .columns-note { font-size: 0.72rem; color: #64748b; margin-top: 8px; }
+
+  /* Per-column heatmaps for hot/cold digit frequency */
+  .heatmap {
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .heatmap-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #334155;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .heatmap-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #64748b;
+  }
+  .heatmap-legend .swatch {
+    width: 14px; height: 14px; border-radius: 3px; display: inline-block;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .heatmap-legend .bar {
+    width: 90px; height: 12px; border-radius: 3px;
+    background: linear-gradient(90deg, #aec8f0, #e8eef0, #f6b9b9);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  /* Hot/Cold summary across all columns */
+  .hotcold-summary {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .hotcold-card {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 8px 6px;
+    background: #ffffff;
+    text-align: center;
+  }
+  .hotcold-card .hc-col {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 6px;
+  }
+  .hotcold-card .hc-row {
+    display: grid;
+    grid-template-columns: 1fr 22px 1fr; /* label | circle | count, circle fixed & centered */
+    align-items: center;
+    column-gap: 8px;
+    font-size: 0.64rem;
+    margin: 3px 0;
+  }
+  .hotcold-card .hc-label { color: #64748b; font-weight: 600; text-align: right; }
+  .hotcold-card .hc-badge {
+    width: 22px; height: 22px; line-height: 22px;
+    border-radius: 50%;
+    font-weight: 700; font-size: 0.82rem;
+    border: 1px solid rgba(0,0,0,0.08);
+    color: #1f2937;
+    text-align: center;
+  }
+  .hotcold-card .hc-badge.hot  { background: #f6b9b9; }
+  .hotcold-card .hc-badge.cold { background: #aec8f0; }
+  .hotcold-card .hc-count { color: #64748b; font-size: 0.6rem; text-align: left; }
+
+  /* Heatmap as a single table: rows = digits 0-9, cols = column1..column6 */
+  .heatmap-table {
+    border-collapse: collapse;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .heatmap-table th,
+  .heatmap-table td {
+    border: 1px solid #e2e8f0;
+    text-align: center;
+    font-size: 0.72rem;
+  }
+  .heatmap-table thead th {
+    color: #1d4ed8;
+    font-weight: 700;
+    padding: 6px 4px;
+    background: #f8fafc;
+  }
+  .heatmap-table th.row-head {
+    color: #1d4ed8;
+    font-weight: 700;
+    width: 44px;
+    background: #f8fafc;
+    padding: 4px;
+  }
+  .heatmap-table td {
+    padding: 6px 4px;
+    color: #1f2937;
+  }
+  .heatmap-table td .count { font-weight: 600; }
+  .heatmap-table td .tag {
+    display: block;
+    font-size: 0.52rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+</style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Random Number Generator</h1>
+    <p class="sub">Generate a number with up to several million digits, right in your browser.</p>
+
+    <div class="controls">
+      <div>
+        <label for="digits">Number of digits</label>
+        <input type="number" id="digits" value="6000000" min="1" max="50000000" step="1000000" />
+      </div>
+      <div>
+        <label for="mode">First digit</label>
+        <select id="mode">
+          <option value="nonzero">Non-zero (true N-digit number)</option>
+          <option value="any">Any digit (allow leading zeros)</option>
+        </select>
+      </div>
+      <button id="genBtn">Generate</button>
+      <button id="copyBtn" class="secondary" disabled>Copy</button>
+      <button id="downloadBtn" class="secondary" disabled>Download .txt</button>
+    </div>
+
+    <div class="progress" id="progress"><div class="bar" id="bar"></div></div>
+
+    <div class="columns-box" id="columnsBox">
+      <div class="hotcold-summary" id="hotcoldSummary"></div>
+
+      <div class="heatmap" id="heatmap">
+        <div class="heatmap-title">
+          Per-Column Digit Heatmap (Hot &amp; Cold)
+          <span class="heatmap-legend">
+            <span>Cold</span>
+            <span class="swatch" style="background:#aec8f0"></span>
+            <span class="bar"></span>
+            <span class="swatch" style="background:#f6b9b9"></span>
+            <span>Hot</span>
+          </span>
+        </div>
+        <table class="heatmap-table" id="heatmapTable"></table>
+      </div>
+
+      <div class="columns-head">
+        <div>Col 1</div><div>Col 2</div><div>Col 3</div>
+        <div>Col 4</div><div>Col 5</div><div>Col 6</div>
+      </div>
+      <div class="columns-grid" id="columnsGrid">
+        <div class="col" id="col0"></div>
+        <div class="col" id="col1"></div>
+        <div class="col" id="col2"></div>
+        <div class="col" id="col3"></div>
+        <div class="col" id="col4"></div>
+        <div class="col" id="col5"></div>
+      </div>
+      <div class="columns-note" id="columnsNote"></div>
+    </div>
+
+    <div class="stats">
+      <span>Length: <b id="lenStat">0</b></span>
+      <span>Generation time: <b id="timeStat">—</b></span>
+      <span>Showing: <b id="showStat">preview only</b></span>
+    </div>
+
+    <textarea class="output" id="output" readonly placeholder="The generated number will appear here..."></textarea>
+
+    <p class="note">
+      For performance, the on-screen box shows a preview (first and last 2,000 digits) when the number is large.
+      The full number is kept in memory and available via Copy or Download.
+    </p>
+  </div>
+
+<script>
+(function () {
+  const digitsInput = document.getElementById('digits');
+  const modeSelect  = document.getElementById('mode');
+  const genBtn      = document.getElementById('genBtn');
+  const copyBtn     = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const output      = document.getElementById('output');
+  const lenStat     = document.getElementById('lenStat');
+  const timeStat    = document.getElementById('timeStat');
+  const showStat    = document.getElementById('showStat');
+  const progressWrap= document.getElementById('progress');
+  const bar         = document.getElementById('bar');
+  const columnsBox  = document.getElementById('columnsBox');
+  const columnsNote = document.getElementById('columnsNote');
+  const heatmapTable= document.getElementById('heatmapTable');
+  const hotcoldSummary = document.getElementById('hotcoldSummary');
+  const colEls      = [0,1,2,3,4,5].map(function (i) { return document.getElementById('col' + i); });
+
+  const NUM_COLS = 6;
+  const COL_PREVIEW = 1500; // digits rendered per column when the number is large
+
+  const PREVIEW_EDGE = 2000; // chars shown from each end when too large to display fully
+  const FULL_DISPLAY_LIMIT = 200000; // show the whole thing below this length
+
+  let fullNumber = ''; // holds the complete generated string
+
+  // Generate random digits efficiently using crypto in chunks.
+  function generateDigits(count, nonZeroFirst, onProgress) {
+    const CHUNK = 65536; // Uint8Array size per crypto call (max 65536 bytes)
+    const parts = [];
+    const buf = new Uint8Array(CHUNK);
+    let produced = 0;
+
+    // Build via array of chunk strings, then join once (fast + low re-alloc).
+    while (produced < count) {
+      crypto.getRandomValues(buf);
+      let s = '';
+      for (let i = 0; i < CHUNK && produced < count; i++) {
+        // Map byte 0-255 to a digit 0-9. Reject >= 250 to keep uniform distribution.
+        const b = buf[i];
+        if (b >= 250) continue;
+        s += (b % 10);
+        produced++;
+      }
+      parts.push(s);
+      if (onProgress) onProgress(produced / count);
+    }
+
+    let result = parts.join('');
+    // Ensure exact length (join may slightly overshoot/undershoot due to rejection; trim).
+    if (result.length > count) result = result.slice(0, count);
+
+    if (nonZeroFirst && result.length > 0 && result[0] === '0') {
+      // Replace leading zero with 1-9.
+      const d = 1 + (crypto.getRandomValues(new Uint8Array(1))[0] % 9);
+      result = d + result.slice(1);
+    }
+    return result;
+  }
+
+  function buildPreview(str) {
+    if (str.length <= FULL_DISPLAY_LIMIT) {
+      showStat.textContent = 'full number';
+      return str;
+    }
+    showStat.textContent = 'preview (first & last ' + PREVIEW_EDGE.toLocaleString() + ' digits)';
+    const head = str.slice(0, PREVIEW_EDGE);
+    const tail = str.slice(-PREVIEW_EDGE);
+    const omitted = str.length - PREVIEW_EDGE * 2;
+    return head + '\n\n... [' + omitted.toLocaleString() + ' digits omitted] ...\n\n' + tail;
+  }
+
+  // Linear interpolate between two [r,g,b] colors; t in [0,1].
+  function lerpColor(a, b, t) {
+    return [
+      Math.round(a[0] + (b[0] - a[0]) * t),
+      Math.round(a[1] + (b[1] - a[1]) * t),
+      Math.round(a[2] + (b[2] - a[2]) * t)
+    ];
+  }
+
+  // Pastel cold (blue) -> neutral -> pastel hot (red).
+  function heatColor(t) {
+    const cold    = [174, 200, 240]; // pastel blue
+    const neutral = [232, 238, 240]; // soft neutral
+    const hot     = [246, 185, 185]; // pastel red
+    let rgb;
+    if (t < 0.5) rgb = lerpColor(cold, neutral, t / 0.5);
+    else         rgb = lerpColor(neutral, hot, (t - 0.5) / 0.5);
+    return 'rgb(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ')';
+  }
+
+  // Count digits per column (digit at position i belongs to column i % 6)
+  // and render ONE table: rows = digits 0-9, columns = column1..column6.
+  function renderHeatmap(str) {
+    // matrix[column][digit] = frequency
+    const matrix = [];
+    for (let c = 0; c < NUM_COLS; c++) matrix.push(new Array(10).fill(0));
+
+    const n = str.length;
+    for (let i = 0; i < n; i++) {
+      // charCodeAt - 48 maps '0'-'9' to 0-9 (faster than parseInt per char).
+      matrix[i % NUM_COLS][str.charCodeAt(i) - 48]++;
+    }
+
+    // Per-column min/max so coloring is relative within each column.
+    const colStats = [];
+    for (let c = 0; c < NUM_COLS; c++) {
+      let min = Infinity, max = -Infinity, maxDigit = 0, minDigit = 0;
+      for (let d = 0; d < 10; d++) {
+        const v = matrix[c][d];
+        if (v > max) { max = v; maxDigit = d; }
+        if (v < min) { min = v; minDigit = d; }
+      }
+      colStats.push({ min: min, max: max, span: (max - min) || 1, maxDigit: maxDigit, minDigit: minDigit });
+    }
+
+    // Hot/Cold summary for every column (shown above the heatmap).
+    let summaryHtml = '';
+    for (let c = 0; c < NUM_COLS; c++) {
+      const stat = colStats[c];
+      summaryHtml +=
+        '<div class="hotcold-card">' +
+          '<div class="hc-col">column' + (c + 1) + '</div>' +
+          '<div class="hc-row">' +
+            '<span class="hc-label">Hot</span>' +
+            '<span class="hc-badge hot">' + stat.maxDigit + '</span>' +
+            '<span class="hc-count">' + stat.max.toLocaleString() + '</span>' +
+          '</div>' +
+          '<div class="hc-row">' +
+            '<span class="hc-label">Cold</span>' +
+            '<span class="hc-badge cold">' + stat.minDigit + '</span>' +
+            '<span class="hc-count">' + stat.min.toLocaleString() + '</span>' +
+          '</div>' +
+        '</div>';
+    }
+    hotcoldSummary.innerHTML = summaryHtml;
+
+    // Header row.
+    let html = '<thead><tr><th class="row-head"></th>';
+    for (let c = 0; c < NUM_COLS; c++) html += '<th>column' + (c + 1) + '</th>';
+    html += '</tr></thead><tbody>';
+
+    // One row per digit 0-9.
+    for (let d = 0; d < 10; d++) {
+      html += '<tr><th class="row-head">' + d + '</th>';
+      for (let c = 0; c < NUM_COLS; c++) {
+        const stat = colStats[c];
+        const v = matrix[c][d];
+        const t = (v - stat.min) / stat.span; // 0 = coldest, 1 = hottest within this column
+        const bg = heatColor(t);
+        let tag = '';
+        if (stat.max !== stat.min && d === stat.maxDigit) tag = '<span class="tag" style="color:#b91c1c">Hot</span>';
+        else if (stat.max !== stat.min && d === stat.minDigit) tag = '<span class="tag" style="color:#1d4ed8">Cold</span>';
+        html +=
+          '<td style="background:' + bg + '" title="column' + (c + 1) + ', digit ' + d + ': ' + v.toLocaleString() + '">' +
+            '<span class="count">' + v.toLocaleString() + '</span>' +
+            tag +
+          '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+
+    heatmapTable.innerHTML = html;
+  }
+
+  // Distribute digits round-robin into 6 columns:
+  // digit 1 -> col 1, digit 2 -> col 2, ... digit 6 -> col 6, digit 7 -> col 1, ...
+  function renderColumns(str) {
+    const n = str.length;
+    const cols = ['', '', '', '', '', ''];
+
+    if (n <= NUM_COLS * COL_PREVIEW) {
+      // Small enough: render every digit into its column.
+      for (let i = 0; i < n; i++) {
+        cols[i % NUM_COLS] += str[i];
+      }
+      for (let c = 0; c < NUM_COLS; c++) colEls[c].textContent = cols[c];
+      columnsNote.textContent =
+        'Showing all ' + n.toLocaleString() + ' digits across 6 columns (digit position % 6).';
+    } else {
+      // Large: render a preview of each column (first COL_PREVIEW digits that land in it).
+      const need = COL_PREVIEW * NUM_COLS; // only need to scan this many source digits
+      const limit = Math.min(n, need);
+      for (let i = 0; i < limit; i++) {
+        cols[i % NUM_COLS] += str[i];
+      }
+      const perCol = Math.ceil(n / NUM_COLS);
+      for (let c = 0; c < NUM_COLS; c++) colEls[c].textContent = cols[c];
+      columnsNote.textContent =
+        'Preview: first ' + COL_PREVIEW.toLocaleString() + ' digits per column shown. ' +
+        'Each column holds about ' + perCol.toLocaleString() + ' digits in total ' +
+        '(full data available via Copy / Download).';
+    }
+    columnsBox.style.display = 'block';
+  }
+
+  function generate() {
+    let count = parseInt(digitsInput.value, 10);
+    if (!Number.isFinite(count) || count < 1) {
+      alert('Enter a valid number of digits (at least 1).');
+      return;
+    }
+    const nonZeroFirst = modeSelect.value === 'nonzero';
+
+    genBtn.disabled = true;
+    copyBtn.disabled = true;
+    downloadBtn.disabled = true;
+    progressWrap.style.display = 'block';
+    bar.style.width = '0%';
+    output.value = 'Generating ' + count.toLocaleString() + ' digits...';
+
+    // Defer so the UI can repaint before heavy work.
+    setTimeout(function () {
+      const start = performance.now();
+      try {
+        fullNumber = generateDigits(count, nonZeroFirst, function (p) {
+          bar.style.width = Math.min(100, Math.round(p * 100)) + '%';
+        });
+      } catch (err) {
+        output.value = 'Error: ' + err.message;
+        genBtn.disabled = false;
+        progressWrap.style.display = 'none';
+        return;
+      }
+      const elapsed = performance.now() - start;
+
+      bar.style.width = '100%';
+      lenStat.textContent = fullNumber.length.toLocaleString();
+      timeStat.textContent = (elapsed / 1000).toFixed(2) + ' s';
+      output.value = buildPreview(fullNumber);
+      renderHeatmap(fullNumber);
+      renderColumns(fullNumber);
+
+      genBtn.disabled = false;
+      copyBtn.disabled = false;
+      downloadBtn.disabled = false;
+      setTimeout(function () { progressWrap.style.display = 'none'; }, 400);
+    }, 30);
+  }
+
+  async function copyAll() {
+    if (!fullNumber) return;
+    try {
+      await navigator.clipboard.writeText(fullNumber);
+      const old = copyBtn.textContent;
+      copyBtn.textContent = 'Copied!';
+      setTimeout(function () { copyBtn.textContent = old; }, 1200);
+    } catch (e) {
+      alert('Copy failed (clipboard may be blocked for very large text). Use Download instead.');
+    }
+  }
+
+  function downloadAll() {
+    if (!fullNumber) return;
+    const blob = new Blob([fullNumber], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fullNumber.length.toLocaleString().replace(/,/g, '') + '-digit-number.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  genBtn.addEventListener('click', generate);
+  copyBtn.addEventListener('click', copyAll);
+  downloadBtn.addEventListener('click', downloadAll);
+})();
+</script>
+</body>
+</html>
